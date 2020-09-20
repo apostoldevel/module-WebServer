@@ -79,7 +79,7 @@ namespace Apostol {
 
             // Request path must be absolute and not contain "..".
             if (LPath.empty() || LPath.front() != '/' || LPath.find(_T("..")) != CString::npos) {
-                AConnection->SendStockReply(CReply::bad_request);
+                AConnection->SendStockReply(CHTTPReply::bad_request);
                 return;
             }
 
