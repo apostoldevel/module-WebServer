@@ -35,11 +35,11 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        //-- CWebServer -----------------------------------------------------------------------------------------------
+        //-- CWebServer ------------------------------------------------------------------------------------------------
 
         //--------------------------------------------------------------------------------------------------------------
 
-        CWebServer::CWebServer(CModuleProcess *AProcess) : CApostolModule(AProcess, "web server") {
+        CWebServer::CWebServer(CModuleProcess *AProcess) : CApostolModule(AProcess, "web server", "worker/WebServer") {
             m_Headers.Add("Authorization");
 
             CWebServer::InitMethods();
@@ -89,7 +89,7 @@ namespace Apostol {
 
         bool CWebServer::Enabled() {
             if (m_ModuleStatus == msUnknown)
-                m_ModuleStatus = Config()->IniFile().ReadBool("worker/WebServer", "enable", true) ? msEnabled : msDisabled;
+                m_ModuleStatus = Config()->IniFile().ReadBool(SectionName().c_str(), "enable", true) ? msEnabled : msDisabled;
             return m_ModuleStatus == msEnabled;
         }
         //--------------------------------------------------------------------------------------------------------------
