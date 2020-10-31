@@ -73,17 +73,17 @@ namespace Apostol {
 
         void CWebServer::DoGet(CHTTPServerConnection *AConnection) {
 
-            auto LRequest = AConnection->Request();
+            auto pRequest = AConnection->Request();
 
-            CString LPath(LRequest->Location.pathname);
+            CString sPath(pRequest->Location.pathname);
 
             // Request path must be absolute and not contain "..".
-            if (LPath.empty() || LPath.front() != '/' || LPath.find(_T("..")) != CString::npos) {
+            if (sPath.empty() || sPath.front() != '/' || sPath.find(_T("..")) != CString::npos) {
                 AConnection->SendStockReply(CHTTPReply::bad_request);
                 return;
             }
 
-            SendResource(AConnection, LPath);
+            SendResource(AConnection, sPath);
         }
         //--------------------------------------------------------------------------------------------------------------
 
