@@ -88,6 +88,8 @@ namespace Apostol {
                 TryFiles.Add("/oauth/index.html");
             }
 
+            TryFiles.Add("/index.html");
+
             SendResource(AConnection, sPath, nullptr, false, TryFiles);
         }
         //--------------------------------------------------------------------------------------------------------------
