@@ -31,7 +31,7 @@ extern "C++" {
 
 namespace Apostol {
 
-    namespace Workers {
+    namespace Module {
 
         //--------------------------------------------------------------------------------------------------------------
 
@@ -39,7 +39,7 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        CWebServer::CWebServer(CModuleProcess *AProcess) : CApostolModule(AProcess, "web server", "worker/WebServer") {
+        CWebServer::CWebServer(CModuleProcess *AProcess) : CApostolModule(AProcess, "web server", "module/WebServer") {
             m_Headers.Add("Authorization");
 
             CWebServer::InitMethods();
