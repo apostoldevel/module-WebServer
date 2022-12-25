@@ -84,6 +84,10 @@ namespace Apostol {
             }
 
             CStringList TryFiles;
+            if (sPath.SubString(0, 7) == _T("/oauth/")) {
+                TryFiles.Add("/oauth/index.html");
+            }
+
             TryFiles.Add("/index.html");
 
             SendResource(AConnection, sPath, nullptr, false, TryFiles);
