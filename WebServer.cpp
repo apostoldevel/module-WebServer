@@ -73,9 +73,9 @@ namespace Apostol {
 
         void CWebServer::DoGet(CHTTPServerConnection *AConnection) {
 
-            auto pRequest = AConnection->Request();
+            const auto &caRequest = AConnection->Request();
 
-            CString sPath(pRequest->Location.pathname);
+            CString sPath(caRequest.Location.pathname);
 
             // Request path must be absolute and not contain "..".
             if (sPath.empty() || sPath.front() != '/' || sPath.find(_T("..")) != CString::npos) {
