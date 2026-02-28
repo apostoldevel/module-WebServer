@@ -1,67 +1,46 @@
-/*++
+#pragma once
 
-Program name:
+#include "apostol/apostol_module.hpp"
 
-  Apostol CRM
+#include <filesystem>
+#include <string_view>
 
-Module Name:
+namespace apostol
+{
 
-  WebServer.hpp
+class Application;
 
-Notices:
+// ─── WebServer ────────────────────────────────────────────────────────────────
+//
+// Serves static files from doc_root.
+//
+// Supported methods:
+//   GET     — serve file; try-files fallback to index.html / SPA root
+//   HEAD    — headers only, no body (Content-Length reflects actual file size)
+//   OPTIONS — handled automatically by ApostolModule (returns Allow header)
+//   others  — 405 Method Not Allowed (handled automatically by ApostolModule)
+//
+// Path rules (mirroring v1 CWebServer::DoGet):
+//   • Must begin with '/'
+//   • Must not contain ".."
+//   • Query string is stripped before resolving the path
+//
+class WebServer final : public ApostolModule
+{
+public:
+    explicit WebServer(Application& app);
 
-  Module: Web Server
+    std::string_view name()    const override { return "WebServer"; }
+    bool             enabled() const override { return enabled_; }
 
-Author:
+protected:
+    void init_methods() override;
 
-  Copyright (c) Prepodobny Alen
+private:
+    void do_get(const HttpRequest& req, HttpResponse& resp, bool head_only);
 
-  mailto: alienufo@inbox.ru
-  mailto: ufocomp@gmail.com
+    std::filesystem::path doc_root_;
+    bool                  enabled_;
+};
 
---*/
-
-#ifndef APOSTOL_WEBSERVER_HPP
-#define APOSTOL_WEBSERVER_HPP
-//----------------------------------------------------------------------------------------------------------------------
-
-extern "C++" {
-
-namespace Apostol {
-
-    namespace Module {
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        //-- CWebServer ------------------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        class CWebServer: public CApostolModule {
-        private:
-
-            void InitMethods() override;
-
-        protected:
-
-            void DoGet(CHTTPServerConnection *AConnection) override;
-
-        public:
-
-            explicit CWebServer(CModuleProcess *AProcess);
-
-            ~CWebServer() override = default;
-
-            static class CWebServer *CreateModule(CModuleProcess *AProcess) {
-                return new CWebServer(AProcess);
-            }
-
-            bool Enabled() override;
-
-        };
-    }
-}
-
-using namespace Apostol::Module;
-}
-#endif //APOSTOL_WEBSERVER_HPP
+} // namespace apostol

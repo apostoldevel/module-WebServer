@@ -1,105 +1,67 @@
-/*++
-
-Program name:
-
-  Apostol CRM
-
-Module Name:
-
-  WebServer.cpp
-
-Notices:
-
-  Module: Web Server
-
-Author:
-
-  Copyright (c) Prepodobny Alen
-
-  mailto: alienufo@inbox.ru
-  mailto: ufocomp@gmail.com
-
---*/
-
-//----------------------------------------------------------------------------------------------------------------------
-
-#include "Core.hpp"
 #include "WebServer.hpp"
-//----------------------------------------------------------------------------------------------------------------------
+#include "apostol/application.hpp"
 
-extern "C++" {
+#include <string>
+#include <vector>
 
-namespace Apostol {
+namespace fs = std::filesystem;
 
-    namespace Module {
+namespace apostol
+{
 
-        //--------------------------------------------------------------------------------------------------------------
+WebServer::WebServer(Application& app)
+    : doc_root_(app.settings().doc_root)
+    , enabled_(app.module_enabled("WebServer"))
+{
+    load_allowed_origins(app.providers());
+}
 
-        //-- CWebServer ------------------------------------------------------------------------------------------------
+void WebServer::init_methods()
+{
+    add_method("GET",  [this](const HttpRequest& req, HttpResponse& resp) {
+        do_get(req, resp, false);
+    });
+    add_method("HEAD", [this](const HttpRequest& req, HttpResponse& resp) {
+        do_get(req, resp, true);
+    });
+}
 
-        //--------------------------------------------------------------------------------------------------------------
+void WebServer::do_get(const HttpRequest& req, HttpResponse& resp, bool head_only)
+{
+    // path is already stripped of query string by the HTTP parser
+    const std::string& path_str = req.path;
 
-        CWebServer::CWebServer(CModuleProcess *AProcess) : CApostolModule(AProcess, "web server", "module/WebServer") {
-            m_Headers.Add("Authorization");
-
-            CWebServer::InitMethods();
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CWebServer::InitMethods() {
-#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
-            m_Methods.AddObject(_T("GET")    , (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoGet(Connection); }));
-            m_Methods.AddObject(_T("OPTIONS"), (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoOptions(Connection); }));
-            m_Methods.AddObject(_T("HEAD")   , (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoHead(Connection); }));
-            m_Methods.AddObject(_T("POST")   , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
-            m_Methods.AddObject(_T("PUT")    , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
-            m_Methods.AddObject(_T("DELETE") , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
-            m_Methods.AddObject(_T("TRACE")  , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
-            m_Methods.AddObject(_T("PATCH")  , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
-            m_Methods.AddObject(_T("CONNECT"), (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
-#else
-            m_Methods.AddObject(_T("GET")    , (CObject *) new CMethodHandler(true, std::bind(&CWebServer::DoGet, this, _1)));
-            m_Methods.AddObject(_T("OPTIONS"), (CObject *) new CMethodHandler(true, std::bind(&CWebServer::DoOptions, this, _1)));
-            m_Methods.AddObject(_T("HEAD")   , (CObject *) new CMethodHandler(true, std::bind(&CWebServer::DoHead, this, _1)));
-            m_Methods.AddObject(_T("POST")   , (CObject *) new CMethodHandler(false, std::bind(&CWebServer::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("PUT")    , (CObject *) new CMethodHandler(false, std::bind(&CWebServer::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("DELETE") , (CObject *) new CMethodHandler(false, std::bind(&CWebServer::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("TRACE")  , (CObject *) new CMethodHandler(false, std::bind(&CWebServer::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("PATCH")  , (CObject *) new CMethodHandler(false, std::bind(&CWebServer::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("CONNECT"), (CObject *) new CMethodHandler(false, std::bind(&CWebServer::MethodNotAllowed, this, _1)));
-#endif
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CWebServer::DoGet(CHTTPServerConnection *AConnection) {
-
-            const auto &caRequest = AConnection->Request();
-
-            CString sPath(caRequest.Location.pathname);
-
-            // Request path must be absolute and not contain "..".
-            if (sPath.empty() || sPath.front() != '/' || sPath.find(_T("..")) != CString::npos) {
-                AConnection->SendStockReply(CHTTPReply::bad_request);
-                return;
-            }
-
-            CStringList TryFiles;
-            if (sPath.SubString(0, 7) == _T("/oauth/")) {
-                TryFiles.Add("/oauth/index.html");
-            }
-
-            TryFiles.Add("/index.html");
-
-            SendResource(AConnection, sPath, nullptr, false, TryFiles);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        bool CWebServer::Enabled() {
-            if (m_ModuleStatus == msUnknown)
-                m_ModuleStatus = Config()->IniFile().ReadBool(SectionName().c_str(), "enable", true) ? msEnabled : msDisabled;
-            return m_ModuleStatus == msEnabled;
-        }
-        //--------------------------------------------------------------------------------------------------------------
+    // Validate: absolute path, no ".." traversal (mirrors v1 DoGet)
+    if (path_str.empty() || path_str.front() != '/' ||
+        path_str.find("..") != std::string::npos)
+    {
+        resp.set_status(400, "Bad Request")
+            .set_body("400 Bad Request", "text/plain");
+        return;
     }
+
+    // Build candidate list (try-files, mirrors v1 CWebServer::DoGet)
+    std::vector<std::string> candidates;
+    candidates.push_back(path_str);
+    if (path_str.back() == '/')
+        candidates.push_back(path_str + "index.html");
+    else
+        candidates.push_back(path_str + "/index.html");
+    candidates.push_back("/index.html"); // SPA fallback
+
+    for (const auto& candidate : candidates)
+    {
+        // Resolve against doc_root; strip leading '/' to make it relative
+        fs::path file_path = doc_root_ / candidate.substr(1);
+        if (fs::exists(file_path) && fs::is_regular_file(file_path))
+        {
+            if (serve_file(file_path, resp, head_only))
+                return;
+        }
+    }
+
+    resp.set_status(404, "Not Found")
+        .set_body("404 Not Found", "text/plain");
 }
-}
+
+} // namespace apostol
