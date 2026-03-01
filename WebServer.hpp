@@ -1,6 +1,7 @@
 #pragma once
 
 #include "apostol/apostol_module.hpp"
+#include "apostol/logger.hpp"
 
 #include <filesystem>
 #include <string_view>
@@ -39,6 +40,7 @@ protected:
 private:
     void do_get(const HttpRequest& req, HttpResponse& resp, bool head_only);
 
+    Logger&               logger_;
     std::filesystem::path doc_root_;
     bool                  enabled_;
 };

@@ -1,6 +1,7 @@
 #include "WebServer.hpp"
 #include "apostol/application.hpp"
 
+#include <fmt/format.h>
 #include <string>
 #include <vector>
 
@@ -10,7 +11,8 @@ namespace apostol
 {
 
 WebServer::WebServer(Application& app)
-    : doc_root_(app.settings().doc_root)
+    : logger_(app.logger())
+    , doc_root_(app.settings().doc_root)
     , enabled_(app.module_enabled("WebServer"))
 {
     load_allowed_origins(app.providers());
@@ -53,10 +55,19 @@ void WebServer::do_get(const HttpRequest& req, HttpResponse& resp, bool head_onl
     {
         // Resolve against doc_root; strip leading '/' to make it relative
         fs::path file_path = doc_root_ / candidate.substr(1);
-        if (fs::exists(file_path) && fs::is_regular_file(file_path))
+        std::error_code ec;
+        if (fs::exists(file_path, ec) && !ec && fs::is_regular_file(file_path, ec) && !ec)
         {
             if (serve_file(file_path, resp, head_only))
                 return;
+        }
+        if (ec)
+        {
+            logger_.warn("WebServer: access denied: {} [{}]",
+                         file_path.string(), ec.message());
+            resp.set_status(403, "Forbidden")
+                .set_body("403 Forbidden", "text/plain");
+            return;
         }
     }
 
