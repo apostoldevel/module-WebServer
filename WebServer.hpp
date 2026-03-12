@@ -1,6 +1,7 @@
 #pragma once
 
 #include "apostol/apostol_module.hpp"
+#include "apostol/site_config.hpp"
 #include "apostol/logger.hpp"
 
 #include <filesystem>
@@ -13,7 +14,7 @@ class Application;
 
 // ─── WebServer ────────────────────────────────────────────────────────────────
 //
-// Serves static files from doc_root.
+// Serves static files from doc_root (or per-site root from sites config).
 //
 // Supported methods:
 //   GET     — serve file; try-files fallback to index.html / SPA root
@@ -39,8 +40,10 @@ protected:
 
 private:
     void do_get(const HttpRequest& req, HttpResponse& resp, bool head_only);
+    std::filesystem::path resolve_root(const HttpRequest& req) const;
 
     Logger&               logger_;
+    const SiteConfigs&    sites_;
     std::filesystem::path doc_root_;
     bool                  enabled_;
 };

@@ -12,6 +12,7 @@ namespace apostol
 
 WebServer::WebServer(Application& app)
     : logger_(app.logger())
+    , sites_(app.sites())
     , doc_root_(app.settings().doc_root)
     , enabled_(app.module_enabled("WebServer"))
 {
@@ -28,6 +29,17 @@ void WebServer::init_methods()
     });
 }
 
+std::filesystem::path WebServer::resolve_root(const HttpRequest& req) const
+{
+    auto host = req.header("Host");
+    if (!host.empty()) {
+        if (const auto* site = sites_.find(host))
+            if (!site->root.empty())
+                return site->root;
+    }
+    return doc_root_;
+}
+
 void WebServer::do_get(const HttpRequest& req, HttpResponse& resp, bool head_only)
 {
     // path is already stripped of query string by the HTTP parser
@@ -42,6 +54,8 @@ void WebServer::do_get(const HttpRequest& req, HttpResponse& resp, bool head_onl
         return;
     }
 
+    const auto root = resolve_root(req);
+
     // Build candidate list (try-files, mirrors v1 CWebServer::DoGet)
     std::vector<std::string> candidates;
     candidates.push_back(path_str);
@@ -53,8 +67,8 @@ void WebServer::do_get(const HttpRequest& req, HttpResponse& resp, bool head_onl
 
     for (const auto& candidate : candidates)
     {
-        // Resolve against doc_root; strip leading '/' to make it relative
-        fs::path file_path = doc_root_ / candidate.substr(1);
+        // Resolve against root; strip leading '/' to make it relative
+        fs::path file_path = root / candidate.substr(1);
         std::error_code ec;
         if (fs::exists(file_path, ec) && !ec && fs::is_regular_file(file_path, ec) && !ec)
         {
