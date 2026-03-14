@@ -4,12 +4,6 @@
 #include "apostol/file_utils.hpp"
 #include "apostol/http_utils.hpp"
 
-#include <fmt/format.h>
-#include <string>
-#include <vector>
-
-namespace fs = std::filesystem;
-
 namespace apostol
 {
 
@@ -56,39 +50,7 @@ void WebServer::do_get(const HttpRequest& req, HttpResponse& resp, bool head_onl
         return;
     }
 
-    const auto root = resolve_root(req);
-
-    // Build candidate list (try-files, mirrors v1 CWebServer::DoGet)
-    std::vector<std::string> candidates;
-    candidates.push_back(path_str);
-    if (path_str.back() == '/')
-        candidates.push_back(path_str + "index.html");
-    else
-        candidates.push_back(path_str + "/index.html");
-    candidates.push_back("/index.html"); // SPA fallback
-
-    for (const auto& candidate : candidates)
-    {
-        // Resolve against root; strip leading '/' to make it relative
-        fs::path file_path = root / candidate.substr(1);
-        std::error_code ec;
-        if (fs::exists(file_path, ec) && !ec && fs::is_regular_file(file_path, ec) && !ec)
-        {
-            if (serve_file(file_path, resp, head_only))
-                return;
-        }
-        if (ec)
-        {
-            logger_.warn("WebServer: access denied: {} [{}]",
-                         file_path.string(), ec.message());
-            resp.set_status(403, "Forbidden")
-                .set_body("403 Forbidden", "text/plain");
-            return;
-        }
-    }
-
-    resp.set_status(404, "Not Found")
-        .set_body("404 Not Found", "text/plain");
+    try_files(resolve_root(req), req, resp, head_only);
 }
 
 } // namespace apostol
