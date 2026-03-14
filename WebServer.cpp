@@ -1,6 +1,9 @@
 #include "WebServer.hpp"
 #include "apostol/application.hpp"
 
+#include "apostol/file_utils.hpp"
+#include "apostol/http_utils.hpp"
+
 #include <fmt/format.h>
 #include <string>
 #include <vector>
@@ -31,8 +34,8 @@ void WebServer::init_methods()
 
 std::filesystem::path WebServer::resolve_root(const HttpRequest& req) const
 {
-    auto host = req.header("Host");
-    if (!host.empty()) {
+    auto host = get_host(req);
+    {
         if (const auto* site = sites_.find(host))
             if (!site->root.empty())
                 return site->root;
@@ -46,8 +49,7 @@ void WebServer::do_get(const HttpRequest& req, HttpResponse& resp, bool head_onl
     const std::string& path_str = req.path;
 
     // Validate: absolute path, no ".." traversal (mirrors v1 DoGet)
-    if (path_str.empty() || path_str.front() != '/' ||
-        path_str.find("..") != std::string::npos)
+    if (path_str.front() != '/' || !is_safe_path(path_str))
     {
         resp.set_status(400, "Bad Request")
             .set_body("400 Bad Request", "text/plain");
